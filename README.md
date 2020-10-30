@@ -1,4 +1,4 @@
-Based on OpenVR, this code can allow you to play panaroma video on spheric surface. 
+Based on OpenVR, this code can allow you to play panaroma video or image on spheric surface. 
 This code can be used with OpenVR example hellovr_opengl.
 
 Dependencies:
