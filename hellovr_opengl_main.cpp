@@ -12,10 +12,13 @@
 #else
 #include <GL/glu.h>
 #endif
+#include <direct.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string>
 #include <cstdlib>
-
+#include<fstream>
+#include<iostream>
 #include <openvr.h>
 
 #include "shared/lodepng.h"
@@ -285,7 +288,9 @@ struct Model
 };
 
 struct CaptureScene {
+	const int SWITCH_LENGTH = 300;
 	Model *m = nullptr;
+	Model *mSwitch = nullptr;
 	int videoWidth;
 	int videoHeight;
 	static const GLushort Stacks = 18;
@@ -348,6 +353,11 @@ struct CaptureScene {
 		TextureBuffer *texture = new TextureBuffer(width, height, 4, frame, 1);
 		ShaderFill *fill = new ShaderFill(vshader, fshader, texture);
 		m = new Model(fill);
+		
+		unsigned char* frameSwitch = new unsigned char[SWITCH_LENGTH * SWITCH_LENGTH * 4]{ 0 };
+		TextureBuffer *textureSwitch = new TextureBuffer(SWITCH_LENGTH, SWITCH_LENGTH, 4, frameSwitch, 1);
+		ShaderFill *fillSwitch = new ShaderFill(vshader, fshader, textureSwitch);
+		mSwitch = new Model(fillSwitch);
 
 #ifdef SPHERE
 		int Radius = 1;
@@ -403,6 +413,27 @@ struct CaptureScene {
 		}
 #endif
 		m->AllocateBuffers();
+
+		VertexDataScene vvvs[4] = { VertexDataScene(Vector3(-(float)SWITCH_LENGTH / 2 * .02, (float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff, Vector2(1, 0)),
+			VertexDataScene(Vector3((float)SWITCH_LENGTH / 2 * .02, (float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff, Vector2(0, 0)),
+			VertexDataScene(Vector3(-(float)SWITCH_LENGTH / 2 * .02, -(float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff, Vector2(1, 1)),
+			VertexDataScene(Vector3((float)SWITCH_LENGTH / 2 * .02, -(float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff,Vector2(0, 1)) };
+		GLuint CubeIndices[] =
+		{
+			0, 2, 1, 1, 2, 3
+		};
+		for (int i = 0; i < 6; i++)
+		{
+			mSwitch->AddIndex(CubeIndices[i]);
+		}
+		for (int i = 0; i < 4; i++)
+		{
+			VertexDataScene vvv = vvvs[i];
+			mSwitch->AddVertexVal(vvv);
+		}
+
+		mSwitch->AllocateBuffers();
+
 		glDeleteShader(vshader);
 		glDeleteShader(fshader);
 	}
@@ -411,6 +442,9 @@ struct CaptureScene {
 	{
 		delete m;
 		m = nullptr;
+
+		delete mSwitch;
+		mSwitch = nullptr;
 	}
 
 	~CaptureScene()
@@ -422,6 +456,7 @@ struct CaptureScene {
 		// Construct geometry
 		m->ChangeVideoFrame(videoWidth, videoHeight, frame);
 		m->Render(mat);
+		mSwitch->Render(mat);
 	}
 };
 
@@ -500,6 +535,7 @@ public:
 
 	CGLRenderModel *FindOrLoadRenderModel(const char *pchRenderModelName);
 	bool getFileToPlay();
+	bool getStreamToPlay();
 
 private:
 	bool m_bDebugOpenGL;
@@ -633,7 +669,7 @@ private: // OpenGL bookkeeping
 	vr::VRActionSetHandle_t m_actionsetDemo = vr::k_ulInvalidActionSetHandle;
 
 	CaptureScene  *roomScene = nullptr;
-	char szFile[260];	   // buffer for file name
+	char szFile[1024];	   // buffer for file name
 	unsigned char *pVideo = nullptr;
 };
 
@@ -1561,13 +1597,26 @@ bool CMainApplication::getFileToPlay()
 	return true;
 }
 
+bool CMainApplication::getStreamToPlay()
+{
+	char *buffer;
+	if ((buffer = _getcwd(NULL, 0)) == NULL)
+		return false;
+	std::string filePath(buffer);
+	std::ifstream readFile(filePath + "/conf.ini");
+	readFile >> szFile;
+	readFile.close();
+	//SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Path", szFile, NULL);
+	return true;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: create a sea of cubes
 //-----------------------------------------------------------------------------
 void CMainApplication::SetupScene()
 {
-	pMedia_ = libvlc_media_new_path(pVLCInstance_, szFile);
+	//pMedia_ = libvlc_media_new_path(pVLCInstance_, szFile);
+	pMedia_ = libvlc_media_new_location(pVLCInstance_, szFile);
 	libvlc_media_player_set_media(pMediaPlayer_, pMedia_);
 	libvlc_video_set_format(pMediaPlayer_, "RV32", m_nRenderWidth, m_nRenderHeight, m_nRenderWidth * 4);
 	libvlc_media_player_play(pMediaPlayer_);
@@ -2371,8 +2420,8 @@ void CGLRenderModel::Draw()
 int main(int argc, char *argv[])
 {
 	CMainApplication *pMainApplication = new CMainApplication(argc, argv);
-	if (!pMainApplication->getFileToPlay()) return 0;
-
+	//if (!pMainApplication->getFileToPlay()) return 0;
+	if (!pMainApplication->getStreamToPlay()) return 0;
 	//Init VLC...
 	const char * const vlc_args[] = { "-I", "dummy", "--ignore-config", "--plugin-path=./plugins", "--sub-track=1000", "--no-video-title-show" };
 	pVLCInstance_ = libvlc_new(sizeof(vlc_args) / sizeof(*vlc_args), vlc_args);
