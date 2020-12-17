@@ -40,6 +40,7 @@
 #endif
 
 #define SPHERE
+#define READ_RTMP_STREAM
 
 void ThreadSleep(unsigned long nMilliseconds)
 {
@@ -288,7 +289,7 @@ struct Model
 };
 
 struct CaptureScene {
-	const int SWITCH_LENGTH = 300;
+	const int SWITCH_LENGTH = 1;
 	Model *m = nullptr;
 	Model *mSwitch = nullptr;
 	int videoWidth;
@@ -355,6 +356,11 @@ struct CaptureScene {
 		m = new Model(fill);
 		
 		unsigned char* frameSwitch = new unsigned char[SWITCH_LENGTH * SWITCH_LENGTH * 4]{ 0 };
+		//Red color BGRA
+		for (int i = 2; i < SWITCH_LENGTH * SWITCH_LENGTH * 4; i+=4)
+		{
+			frameSwitch[i] = 255;
+		}
 		TextureBuffer *textureSwitch = new TextureBuffer(SWITCH_LENGTH, SWITCH_LENGTH, 4, frameSwitch, 1);
 		ShaderFill *fillSwitch = new ShaderFill(vshader, fshader, textureSwitch);
 		mSwitch = new Model(fillSwitch);
@@ -414,13 +420,13 @@ struct CaptureScene {
 #endif
 		m->AllocateBuffers();
 
-		VertexDataScene vvvs[4] = { VertexDataScene(Vector3(-(float)SWITCH_LENGTH / 2 * .02, (float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff, Vector2(1, 0)),
-			VertexDataScene(Vector3((float)SWITCH_LENGTH / 2 * .02, (float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff, Vector2(0, 0)),
-			VertexDataScene(Vector3(-(float)SWITCH_LENGTH / 2 * .02, -(float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff, Vector2(1, 1)),
-			VertexDataScene(Vector3((float)SWITCH_LENGTH / 2 * .02, -(float)SWITCH_LENGTH / 2 * .02, 0), 0xffffffff,Vector2(0, 1)) };
+		VertexDataScene vvvs[4] = { VertexDataScene(Vector3(-0.1f, -0.1f, (float)SWITCH_LENGTH * 0.5f), 0xffffffff, Vector2(0, 1)),
+			VertexDataScene(Vector3((float)SWITCH_LENGTH * 0.1f - 0.1f, -0.1f, (float)SWITCH_LENGTH * 0.5f), 0xffffffff, Vector2(1, 1)),
+			VertexDataScene(Vector3((float)SWITCH_LENGTH * 0.1f - 0.1f, (float)SWITCH_LENGTH * 0.1f - 0.1f, (float)SWITCH_LENGTH * 0.5f), 0xffffffff, Vector2(1, 0)),
+			VertexDataScene(Vector3(-0.1f, (float)SWITCH_LENGTH * 0.1f - 0.1f, (float)SWITCH_LENGTH * 0.5f), 0xffffffff,Vector2(0, 0)) };
 		GLuint CubeIndices[] =
 		{
-			0, 2, 1, 1, 2, 3
+			0, 1, 2, 2, 3, 0
 		};
 		for (int i = 0; i < 6; i++)
 		{
@@ -1615,8 +1621,11 @@ bool CMainApplication::getStreamToPlay()
 //-----------------------------------------------------------------------------
 void CMainApplication::SetupScene()
 {
-	//pMedia_ = libvlc_media_new_path(pVLCInstance_, szFile);
+#ifdef READ_RTMP_STREAM
 	pMedia_ = libvlc_media_new_location(pVLCInstance_, szFile);
+#else
+	pMedia_ = libvlc_media_new_path(pVLCInstance_, szFile);
+#endif
 	libvlc_media_player_set_media(pMediaPlayer_, pMedia_);
 	libvlc_video_set_format(pMediaPlayer_, "RV32", m_nRenderWidth, m_nRenderHeight, m_nRenderWidth * 4);
 	libvlc_media_player_play(pMediaPlayer_);
@@ -2420,8 +2429,11 @@ void CGLRenderModel::Draw()
 int main(int argc, char *argv[])
 {
 	CMainApplication *pMainApplication = new CMainApplication(argc, argv);
-	//if (!pMainApplication->getFileToPlay()) return 0;
+#ifdef READ_RTMP_STREAM
 	if (!pMainApplication->getStreamToPlay()) return 0;
+#else
+	if (!pMainApplication->getFileToPlay()) return 0;
+#endif
 	//Init VLC...
 	const char * const vlc_args[] = { "-I", "dummy", "--ignore-config", "--plugin-path=./plugins", "--sub-track=1000", "--no-video-title-show" };
 	pVLCInstance_ = libvlc_new(sizeof(vlc_args) / sizeof(*vlc_args), vlc_args);
